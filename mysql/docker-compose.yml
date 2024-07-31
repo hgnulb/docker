@@ -1,0 +1,16 @@
+# 推荐文件路径：${你的工作目录}/docker/mysql/docker-compose.yml
+# 后续使用 docker 管理的服务都可以集中在 ${你的工作目录}/docker 下方便管理
+
+version: '3.1'
+
+services:
+  mysql:
+    image: mysql:8.0.31
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./volume/var/lib/mysql:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 12345678 # 你自定义的 MySQL root 用户密码
