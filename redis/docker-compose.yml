@@ -13,4 +13,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  redis_data:
+  redis_data: # 自动创建持久化卷
