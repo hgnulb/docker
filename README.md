@@ -9,3 +9,11 @@ docker-compose up -d
 ## 查看服务启动情况
 
 docker ps -a
+
+## 停止容器、服务
+
+docker stop <容器ID 或 名称>
+
+## 删除容器、服务
+
+docker rm -f <容器ID 或 名称>

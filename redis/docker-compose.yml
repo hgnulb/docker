@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   redis:
     image: redis:7.0
@@ -8,9 +6,11 @@ services:
     volumes:
       - redis_data:/data
     environment:
-      - REDIS_PASSWORD=123456 # 必须设置密码
-    command: redis-server --requirepass $${REDIS_PASSWORD}
+      - REDIS_PASSWORD=123456
+    # 必须设置密码
+    command: redis-server --requirepass ${REDIS_PASSWORD}
     restart: unless-stopped
 
 volumes:
-  redis_data: # 自动创建持久化卷
+  # 自动创建持久化卷
+  redis_data:
