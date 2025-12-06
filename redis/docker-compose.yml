@@ -6,11 +6,9 @@ services:
     volumes:
       - redis_data:/data
     environment:
-      - REDIS_PASSWORD=123456
-    # 必须设置密码
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
     command: redis-server --requirepass ${REDIS_PASSWORD}
     restart: unless-stopped
 
 volumes:
-  # 自动创建持久化卷
   redis_data:
