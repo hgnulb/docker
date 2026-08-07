@@ -1,0 +1,21 @@
+name: dev-redis
+
+services:
+  redis:
+    image: redis:${REDIS_VERSION:-7.4}-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD:-dev_redis_password}
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-dev_redis_password}"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  redis_data:

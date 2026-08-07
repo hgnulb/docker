@@ -1,0 +1,18 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: [alertname, job]
+  group_wait: 10s
+  group_interval: 5m
+  repeat_interval: 4h
+  # 默认只在 Alertmanager UI 中保留告警，不依赖外部通知渠道。
+  # 启动 prometheus-alert 后可改为 prometheus-alert。
+  receiver: local
+
+receivers:
+  - name: local
+  - name: prometheus-alert
+    webhook_configs:
+      - url: http://prometheus-alert:8080/prometheus/alert
+        send_resolved: true

@@ -1,0 +1,23 @@
+name: dev-zookeeper
+
+services:
+  zookeeper:
+    image: zookeeper:${ZOOKEEPER_VERSION:-3.9.4}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${ZOOKEEPER_PORT:-2181}:2181"
+    environment:
+      ZOO_MY_ID: 1
+      ZOO_4LW_COMMANDS_WHITELIST: ruok,srvr,stat,mntr
+    volumes:
+      - zookeeper_data:/data
+      - zookeeper_datalog:/datalog
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc 127.0.0.1 2181 | grep imok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  zookeeper_data:
+  zookeeper_datalog:

@@ -1,0 +1,100 @@
+name: dev-rocketmq
+
+services:
+  volume-init:
+    image: apache/rocketmq:${ROCKETMQ_VERSION:-5.5.0}
+    # RocketMQ 5.5 官方镜像使用 uid/gid 3000；新 named volume 默认归 root，首次启动前先修正权限。
+    user: "0:0"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - chown -R 3000:3000 /namesrv-logs /broker-logs /broker-store
+    volumes:
+      - namesrv_logs:/namesrv-logs
+      - broker_logs:/broker-logs
+      - broker_store:/broker-store
+    restart: "no"
+
+  namesrv:
+    image: apache/rocketmq:${ROCKETMQ_VERSION:-5.5.0}
+    restart: unless-stopped
+    command: sh mqnamesrv
+    ports:
+      - "127.0.0.1:${ROCKETMQ_NAMESRV_PORT:-9876}:9876"
+    volumes:
+      - namesrv_logs:/home/rocketmq/logs
+    depends_on:
+      volume-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "sh mqadmin getNamesrvConfig -n 127.0.0.1:9876 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 15s
+
+  broker:
+    image: apache/rocketmq:${ROCKETMQ_VERSION:-5.5.0}
+    restart: unless-stopped
+    command: sh mqbroker -n namesrv:9876 -c /home/rocketmq/conf/broker.conf
+    depends_on:
+      volume-init:
+        condition: service_completed_successfully
+      namesrv:
+        condition: service_healthy
+    ports:
+      # 部分旧客户端默认使用 VIP 通道（Broker 端口减 2）。
+      - "127.0.0.1:10909:10909"
+      # Broker 广播端口固定为 10911，修改宿主机端口会导致客户端发现地址失效。
+      - "127.0.0.1:10911:10911"
+    volumes:
+      - ./broker.conf:/home/rocketmq/conf/broker.conf:ro
+      - broker_logs:/home/rocketmq/logs
+      - broker_store:/home/rocketmq/store
+    healthcheck:
+      test: ["CMD-SHELL", "sh mqadmin clusterList -n namesrv:9876 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+
+  dashboard:
+    image: apacherocketmq/rocketmq-dashboard:${ROCKETMQ_DASHBOARD_VERSION:-2.1.0}
+    restart: unless-stopped
+    depends_on:
+      namesrv:
+        condition: service_started
+      broker:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${ROCKETMQ_DASHBOARD_PORT:-8082}:8080"
+    environment:
+      # 显式固定容器端口，避免 Dashboard 镜像默认端口变更导致映射失效。
+      JAVA_OPTS: -Dserver.port=8080 -Drocketmq.namesrv.addr=namesrv:9876
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  dashboard-broker-proxy:
+    # Dashboard 得到 127.0.0.1 地址；共享其网络空间并转发 VIP/Broker 两个端口。
+    image: alpine/socat:${SOCAT_VERSION:-1.8.0.3}
+    restart: unless-stopped
+    network_mode: service:dashboard
+    depends_on:
+      broker:
+        condition: service_healthy
+      dashboard:
+        condition: service_healthy
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - >-
+        socat TCP-LISTEN:10909,fork,reuseaddr TCP:broker:10909 &
+        exec socat TCP-LISTEN:10911,fork,reuseaddr TCP:broker:10911
+
+volumes:
+  namesrv_logs:
+  broker_logs:
+  broker_store:

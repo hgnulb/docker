@@ -1,0 +1,32 @@
+name: dev-alloy
+
+services:
+  alloy:
+    image: grafana/alloy:${ALLOY_VERSION:-v1.18.0}
+    restart: unless-stopped
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    ports:
+      - "127.0.0.1:${ALLOY_PORT:-12345}:12345"
+    volumes:
+      - ./config.alloy:/etc/alloy/config.alloy:ro
+      - alloy_data:/var/lib/alloy/data
+      # 通过 Docker API 发现容器并读取 stdout/stderr；该挂载拥有较高权限，仅限本机使用。
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [dev-backend]
+    healthcheck:
+      test: ["CMD", "alloy", "validate", "/etc/alloy/config.alloy"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  alloy_data:
+
+networks:
+  dev-backend:
+    external: true
+    name: dev-backend

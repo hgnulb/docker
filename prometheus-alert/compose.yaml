@@ -1,0 +1,31 @@
+name: dev-prometheus-alert
+
+services:
+  prometheus-alert:
+    image: feiyu563/prometheus-alert:${PROMETHEUS_ALERT_VERSION:-v5.0.0}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${PROMETHEUS_ALERT_PORT:-18080}:8080"
+    environment:
+      # 镜像会把 PA_ 前缀变量映射到 app.conf 配置项。
+      PA_LOGIN_USER: ${PROMETHEUS_ALERT_USER:-prometheusalert}
+      PA_LOGIN_PASSWORD: ${PROMETHEUS_ALERT_PASSWORD:-dev_prometheus_alert_password}
+      PA_TITLE: ${PROMETHEUS_ALERT_TITLE:-Local PrometheusAlert}
+      PA_LOGTYPE: console
+    volumes:
+      # 保存 SQLite 模板和告警路由配置。
+      - prometheus_alert_data:/app/db
+    networks: [dev-backend]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  prometheus_alert_data:
+
+networks:
+  dev-backend:
+    external: true
+    name: dev-backend

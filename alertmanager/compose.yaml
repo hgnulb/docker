@@ -1,0 +1,32 @@
+name: dev-alertmanager
+
+services:
+  alertmanager:
+    image: prom/alertmanager:${ALERTMANAGER_VERSION:-v0.32.1}
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yaml
+      - --storage.path=/alertmanager
+      - --data.retention=${ALERTMANAGER_RETENTION:-120h}
+      # 单机开发不启用集群监听，避免暴露不必要的端口。
+      - --cluster.listen-address=
+      - --web.external-url=http://localhost:${ALERTMANAGER_PORT:-9093}
+    ports:
+      - "127.0.0.1:${ALERTMANAGER_PORT:-9093}:9093"
+    volumes:
+      - ./alertmanager.yaml:/etc/alertmanager/alertmanager.yaml:ro
+      - alertmanager_data:/alertmanager
+    networks: [dev-backend]
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9093/-/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  alertmanager_data:
+
+networks:
+  dev-backend:
+    external: true
+    name: dev-backend

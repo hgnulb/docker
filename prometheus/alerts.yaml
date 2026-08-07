@@ -1,0 +1,11 @@
+groups:
+  - name: local-targets
+    rules:
+      - alert: PrometheusTargetDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus target {{ $labels.job }} 已离线"
+          description: "实例 {{ $labels.instance }} 已连续 2 分钟无法抓取。"

@@ -1,0 +1,40 @@
+name: dev-canal
+
+services:
+  canal-server:
+    image: canal/canal-server:${CANAL_VERSION:-v1.1.8}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${CANAL_SERVER_PORT:-11111}:11111"
+      - "127.0.0.1:${CANAL_ADMIN_PORT:-11110}:11110"
+      - "127.0.0.1:${CANAL_METRICS_PORT:-11112}:11112"
+    # 默认通过共享网络订阅 mysql 模块，也可在 .env 中改成其他地址。
+    networks: [dev-backend]
+    environment:
+      canal.auto.scan: "true"
+      canal.destinations: ${CANAL_DESTINATIONS:-example}
+      canal.instance.master.address: ${CANAL_MYSQL_HOST:-mysql}:${CANAL_MYSQL_PORT:-3306}
+      canal.instance.dbUsername: ${CANAL_MYSQL_USER:-canal}
+      canal.instance.dbPassword: ${CANAL_MYSQL_PASSWORD:-dev_canal_password}
+      canal.instance.connectionCharset: UTF-8
+      canal.instance.tsdb.enable: "true"
+    volumes:
+      - canal_logs:/home/admin/canal-server/logs
+      # 保存 instance 配置和 TSDB 位点，避免重建容器后从旧位置重复消费。
+      - canal_conf:/home/admin/canal-server/conf
+    healthcheck:
+      # 同时确认 Admin、Server 和 Metrics 三个监听端口已经就绪。
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 11110 && nc -z 127.0.0.1 11111 && nc -z 127.0.0.1 11112"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
+
+volumes:
+  canal_logs:
+  canal_conf:
+
+networks:
+  dev-backend:
+    external: true
+    name: dev-backend

@@ -1,0 +1,42 @@
+name: dev-elasticsearch
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION:-8.19.17}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${ELASTIC_PORT:-9200}:9200"
+    environment:
+      discovery.type: single-node
+      # 仅限本机开发：关闭 TLS 和账号认证，切勿照搬到生产环境。
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms${ELASTIC_HEAP:-1g} -Xmx${ELASTIC_HEAP:-1g}
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:${ELASTIC_VERSION:-8.19.17}
+    restart: unless-stopped
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${KIBANA_PORT:-5601}:5601"
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    healthcheck:
+      # 等到 Kibana API 真正可用，避免 `make up --wait` 在页面尚未就绪时提前返回。
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:5601/api/status >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+volumes:
+  elasticsearch_data:

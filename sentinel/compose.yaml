@@ -1,0 +1,20 @@
+name: dev-sentinel
+
+services:
+  sentinel-dashboard:
+    # Sentinel 官方未发布 Docker 镜像，这里使用常见的社区构建版。
+    image: bladex/sentinel-dashboard:${SENTINEL_VERSION:-1.8.8}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${SENTINEL_PORT:-8858}:8858"
+    environment:
+      # 镜像 Entrypoint 是固定的 exec-form，不会展开 JAVA_OPTS；JAVA_TOOL_OPTIONS 由 JVM 自动读取。
+      JAVA_TOOL_OPTIONS: >-
+        -Dauth.username=${SENTINEL_USER:-sentinel}
+        -Dauth.password=${SENTINEL_PASSWORD:-dev_sentinel_password}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8858/"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s

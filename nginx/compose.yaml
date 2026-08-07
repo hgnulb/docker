@@ -1,0 +1,24 @@
+name: dev-nginx
+
+services:
+  nginx:
+    image: nginx:${NGINX_VERSION:-1.29-alpine}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${NGINX_HTTP_PORT:-80}:80"
+    volumes:
+      - ./default.conf:/etc/nginx/conf.d/default.conf:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks: [dev-backend]
+    healthcheck:
+      # 显式使用 IPv4；精简镜像中的 localhost 可能优先解析到未监听的 ::1。
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+networks:
+  dev-backend:
+    external: true
+    name: dev-backend
