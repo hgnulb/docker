@@ -1,6 +1,6 @@
 # Docker 本地后端开发环境
 
-这个仓库集中管理后端开发常用的数据库、消息队列、注册配置中心、可观测性和 AI 基础设施。
+这个仓库集中管理后端开发常用的数据库、消息队列、大数据、DevOps、注册配置中心、可观测性和 AI 基础设施。
 
 设计原则：
 
@@ -15,8 +15,11 @@
 ## 环境要求
 
 - Docker Desktop，或 Docker Engine + Docker Compose v2。
-- 建议 Docker 至少分配 4 GB 内存；同时运行 Elasticsearch、Langfuse 等较重模块时建议 8 GB 以上。
+- 建议 Docker 至少分配 4 GB 内存；同时运行完整 ELK、Langfuse 等较重模块时建议 8 GB 以上。
 - Langfuse 完整栈较重，若要稳定运行，建议为 Docker 分配约 4 核 CPU、16 GB 内存。
+- GitLab CE 很重，官方单节点基线为 8 vCPU、16 GB 内存；本地受限配置也建议至少预留约 8 GB。
+- Jenkins 官方建议小团队环境预留 4 GB 以上内存和 50 GB 以上磁盘；本地空闲实例通常低于该用量。
+- Flink、Spark、Doris、Airflow、SonarQube 和 Nexus 都属于较重组件，建议按链路选择启动，不要与完整 ELK、GitLab 同时全开。
 - Apple Silicon 可以运行绝大多数 ARM64 镜像。XXL-JOB 3.4.0 官方镜像仅有 AMD64，会由 Docker Desktop 模拟运行。
 
 先检查本机环境：
@@ -122,10 +125,13 @@ diff -u redis/.env.example redis/.env
 | `redis` | Redis 7.4 | `127.0.0.1:6379` |
 | `minio` | MinIO + Console | `9000`、<http://localhost:9001> |
 | `clickhouse` | ClickHouse | HTTP `8123`、Native `19000` |
-| `elasticsearch` | Elasticsearch + Kibana | `9200`、<http://localhost:5601> |
+| `elasticsearch` | ELK：Elasticsearch + Logstash + Kibana | `9200/5000/5044`、<http://localhost:5601> |
 | `kafka` | Kafka KRaft + Kafka UI | `9092`、<http://localhost:8081> |
+| `rabbitmq` | RabbitMQ AMQP + Management UI | `5672`、<http://localhost:15672> |
 | `rocketmq` | NameServer + Broker + Dashboard | `9876/10909/10911`、<http://localhost:8082> |
 | `zookeeper` | ZooKeeper | `2181` |
+| `etcd` | etcd 分布式 KV | `2379` |
+| `consul` | Consul 服务发现、KV + Web UI | `8500/8600`、<http://localhost:8500> |
 | `nacos` | Nacos 注册/配置中心 | `8848/9848`、<http://localhost:18000> |
 | `apollo` | Apollo + 独立 MySQL | Portal <http://localhost:8070>、Config `8080`、Admin `8090` |
 | `sentinel` | Sentinel Dashboard | <http://localhost:8858> |
@@ -143,6 +149,19 @@ diff -u redis/.env.example redis/.env
 | `langfuse` | Langfuse v4 完整本地环境 | <http://localhost:3300> |
 | `qdrant` | Qdrant 向量数据库 | API `6333/6334`、<http://localhost:6333/dashboard> |
 | `ollama` | Ollama 本地模型 | `11434` |
+| `meilisearch` | Meilisearch 轻量全文搜索 | `7700` |
+| `n8n` | n8n 工作流自动化（fair-code） | <http://localhost:5678> |
+| `mailpit` | Mailpit 邮件/SMTP 测试 | SMTP `1025`、<http://localhost:8025> |
+| `gitlab` | GitLab CE 代码托管与 DevOps | <http://gitlab.localhost:8929>、SSH `2224` |
+| `jenkins` | Jenkins LTS 自动化与 CI/CD | <http://localhost:8084>、Agent `50000` |
+| `flink` | Apache Flink 流批计算 | <http://localhost:18081> |
+| `spark` | Apache Spark Standalone | Master `17077`、UI <http://localhost:18082>、Worker UI <http://localhost:18083> |
+| `doris` | Apache Doris MPP 分析数据库 | FE <http://localhost:18030>、MySQL 协议 `9030`、BE `18040` |
+| `trino` | Trino 联邦查询引擎 | <http://localhost:18084> |
+| `airflow` | Apache Airflow 调度与编排 | <http://localhost:18085> |
+| `sonarqube` | SonarQube Community 代码质量平台 | <http://localhost:19001> |
+| `nexus` | Nexus Repository Community 制品库 | <http://localhost:18086> |
+| `harbor` | Harbor 私有镜像仓库 + Trivy（官方安装器） | <http://harbor.localhost:18087> |
 
 ## 管理页面与默认账号
 
@@ -156,8 +175,21 @@ diff -u redis/.env.example redis/.env
 | Apollo | `apollo / admin` |
 | XXL-JOB | `admin / 123456` |
 | Nacos | 用户名 `nacos`，首次访问控制台时初始化密码 |
+| etcd | 默认未启用认证和 TLS，仅限本机开发 |
+| Consul | 默认未启用 ACL 和 TLS，仅限本机开发 |
 | Langfuse | 没有预置 Web 用户，首次访问自行注册；内部 MinIO 为 `minio / dev_langfuse_minio` |
-| Elasticsearch/Kibana、Kafka UI、RocketMQ Dashboard | 默认未启用认证，仅限本机开发 |
+| RabbitMQ | `app / dev_rabbitmq_password` |
+| Meilisearch | Master Key `dev_meilisearch_master_key` |
+| n8n | 没有预置 Web 用户，首次访问自行创建所有者账号 |
+| Mailpit | 默认未启用认证，仅限本机开发 |
+| GitLab CE | `root / dev_gitlab_root_password`；仅在空 volume 首次初始化 |
+| Jenkins | 首次启动时生成解锁密码，使用模块 README 中的命令读取 |
+| Doris | 本地默认 `root` 空密码；仅绑定本机，接入项目后应创建独立账号 |
+| Airflow | `standalone` 首次启动生成管理员账号和密码，详见模块 README |
+| SonarQube | 首次登录 `admin / admin`，系统会要求修改密码 |
+| Nexus | 首次启动生成管理员密码，使用模块 README 中的命令读取 |
+| Harbor | `admin / dev_harbor_admin_password`；安装前应通过环境变量替换 |
+| ELK、Kafka UI、RocketMQ Dashboard | 默认未启用认证，仅限本机开发 |
 
 以上均为本地开发便利配置，来源包括 `.env.example`、初始化数据及模块默认设置；不要用于共享环境或生产环境。
 
@@ -186,6 +218,8 @@ make up DIR=xxl-job
 
 Nacos 和 Apollo 都能管理配置：简单项目使用 Nacos 即可；需要更完整的配置发布、审计和回滚流程时，可以用 Nacos 做注册中心、Apollo 做配置中心。
 
+etcd 更适合作为 Kubernetes、分布式协调组件等系统的底层一致性 KV；Consul 更侧重跨语言服务发现、健康检查、DNS 和 KV。它们与 Nacos 的定位有重叠，按项目实际依赖选择即可，不建议日常同时启动。
+
 ### 数据同步与搜索
 
 ```bash
@@ -202,7 +236,37 @@ make up DIR=clickhouse
 MySQL -> Canal -> Kafka -> Elasticsearch / ClickHouse / 业务消费者
 ```
 
+Elasticsearch 模块已包含 Logstash 和 Kibana，默认提供 `5000` JSON Lines TCP、`5044` Beats 输入，并写入 `dev-logs-*` 索引。只需要搜索引擎、不需要日志管道时，可单独启动服务：
+
+```bash
+docker compose --env-file elasticsearch/.env.example \
+  -f elasticsearch/compose.yaml up -d --wait elasticsearch kibana
+```
+
 这只是常见架构示意。当前 Canal 模块提供 Binlog 订阅服务，不会自动把数据写入 Kafka、Elasticsearch 或 ClickHouse；仍需配置 Kafka 模式、Canal Adapter 或业务消费者完成后续投递。
+
+### 大数据计算与分析
+
+```bash
+make up DIR=kafka
+make up DIR=flink
+make up DIR=spark
+make up DIR=doris
+make up DIR=trino
+make up DIR=airflow
+```
+
+这些都是互联网公司常见的 Apache/社区开源组件，而不是百度、字节等公司的内部自研项目。典型分工如下：
+
+```text
+Kafka -> Flink（实时流处理） -> Doris / ClickHouse
+      -> Spark（批处理、SQL、机器学习）
+
+Trino -> MySQL / PostgreSQL / ClickHouse（跨数据源联邦查询）
+Airflow -> 编排 Spark、Flink、SQL 和数据同步任务
+```
+
+仓库提供的是单机开发拓扑：Flink 为 1 个 JobManager + 1 个 TaskManager，Spark 为 Standalone Master + Worker，Doris 为 1 FE + 1 BE。它适合本地联调和学习，不代表生产集群架构。Trino 已预置 MySQL、PostgreSQL 和 ClickHouse catalog；启动对应数据源后即可用服务名访问。
 
 ### 可观测性
 
@@ -303,6 +367,49 @@ make up DIR=langfuse WAIT_TIMEOUT=600
 
 Langfuse 首次初始化数据库可能需要几分钟。`LANGFUSE_ENCRYPTION_KEY` 在已有数据后不能随意更换，否则已加密内容将无法解密。
 
+### 工作流与应用集成测试
+
+```bash
+make up DIR=n8n
+make up DIR=rabbitmq
+make up DIR=meilisearch
+make up DIR=mailpit
+```
+
+n8n、RabbitMQ、Meilisearch 和 Mailpit 都加入了 `dev-backend`，其他已加入该网络的容器可分别通过 `n8n:5678`、`rabbitmq:5672`、`meilisearch:7700` 和 `mailpit:1025` 访问。宿主机应使用各自映射到 `127.0.0.1` 的端口。
+
+n8n 首次启动前建议执行 `make init DIR=n8n`，再用 `openssl rand -hex 32` 替换 `.env` 中的加密密钥。Mailpit 只截获测试邮件，不会投递到真实收件人。
+
+### 代码托管与 DevOps
+
+```bash
+make init DIR=gitlab
+# 修改 gitlab/.env 中的 root 密码
+make up DIR=gitlab WAIT_TIMEOUT=900
+```
+
+GitLab CE 首次启动可能需要数分钟，默认页面为 <http://gitlab.localhost:8929>，SSH Clone 端口为 `2224`。该模块为小规模本地使用降低了 Puma/Sidekiq 并发并关闭内置 Prometheus，但仍明显重于其他模块；不使用时建议及时 `make down DIR=gitlab`。
+
+Jenkins 使用固定 LTS + JDK 21 镜像：
+
+```bash
+make up DIR=jenkins WAIT_TIMEOUT=600
+docker compose -f jenkins/compose.yaml exec jenkins \
+  cat /var/jenkins_home/secrets/initialAdminPassword
+```
+
+打开 <http://localhost:8084> 完成初始化。默认不挂载宿主机 Docker Socket；如需构建容器镜像，应使用独立 Agent 或带 TLS 的 Docker-in-Docker，避免让普通 Pipeline 直接控制宿主机 Docker。
+
+代码扫描、制品库和镜像仓库按需启动：
+
+```bash
+make up DIR=sonarqube WAIT_TIMEOUT=600
+make up DIR=nexus WAIT_TIMEOUT=600
+./harbor/install.sh
+```
+
+SonarQube Community 用于静态代码质量检查，Nexus Community 管理 Maven/npm/PyPI 等制品，Harbor 管理 OCI/Docker 镜像并启用 Trivy 漏洞扫描。Harbor 使用官方安装器现场生成多服务 Compose 和密钥，因此不走根目录通用 `make up`；具体管理命令见 `harbor/README.md`。
+
 ## 默认开发连接
 
 ```text
@@ -311,8 +418,23 @@ Postgres:  postgresql://app:dev_postgres_password@127.0.0.1:5432/app
 MongoDB:   mongodb://root:dev_mongo_password@127.0.0.1:27017/app?authSource=admin
 Redis:     redis://:dev_redis_password@127.0.0.1:6379/0
 Kafka:     localhost:9092
+RabbitMQ:  amqp://app:dev_rabbitmq_password@127.0.0.1:5672/%2F
 RocketMQ:  NameServer 127.0.0.1:9876，Broker 127.0.0.1:10911
 Nacos:     127.0.0.1:8848
+etcd:      http://127.0.0.1:2379
+Consul:    http://127.0.0.1:8500，DNS 127.0.0.1:8600
+Meilisearch: http://127.0.0.1:7700
+Mailpit:   smtp://127.0.0.1:1025
+GitLab:    http://gitlab.localhost:8929，SSH localhost:2224
+Jenkins:   http://127.0.0.1:8084，Agent 127.0.0.1:50000
+Flink:     http://127.0.0.1:18081
+Spark:     spark://127.0.0.1:17077，UI http://127.0.0.1:18082
+Doris:     mysql://root@127.0.0.1:9030
+Trino:     http://127.0.0.1:18084
+Airflow:   http://127.0.0.1:18085
+SonarQube: http://127.0.0.1:19001
+Nexus:     http://127.0.0.1:18086
+Harbor:    http://harbor.localhost:18087
 ```
 
 ClickHouse HTTP 示例：

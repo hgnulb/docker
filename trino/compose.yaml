@@ -1,0 +1,20 @@
+name: dev-trino
+
+services:
+  trino:
+    image: trinodb/trino:${TRINO_VERSION:-483}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${TRINO_PORT:-18084}:8080"
+    volumes:
+      - ./catalog:/etc/trino/catalog:ro
+      - trino_data:/var/trino/data
+    networks: [dev-backend]
+
+volumes:
+  trino_data:
+
+networks:
+  dev-backend:
+    external: true
+    name: dev-backend

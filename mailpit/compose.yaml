@@ -1,0 +1,24 @@
+name: dev-mailpit
+
+services:
+  mailpit:
+    image: axllent/mailpit:${MAILPIT_VERSION:-v1.27.4}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025"
+    environment:
+      MP_DATABASE: /data/mailpit.db
+      MP_MAX_MESSAGES: ${MAILPIT_MAX_MESSAGES:-5000}
+      TZ: ${MAILPIT_TIMEZONE:-Asia/Shanghai}
+    volumes:
+      - mailpit_data:/data
+    networks: [dev-backend]
+
+volumes:
+  mailpit_data:
+
+networks:
+  dev-backend:
+    external: true
+    name: dev-backend

@@ -1,0 +1,53 @@
+name: dev-doris
+
+services:
+  doris-fe:
+    image: apache/doris:${DORIS_FE_VERSION:-fe-4.0.1}
+    restart: unless-stopped
+    hostname: doris-fe
+    environment:
+      FE_SERVERS: fe1:doris-fe:9010
+      FE_ID: 1
+      JAVA_OPTS: -Xms${DORIS_FE_HEAP:-2g} -Xmx${DORIS_FE_HEAP:-2g} -Dfile.encoding=UTF-8
+      JAVA_OPTS_FOR_JDK_17: -Xms${DORIS_FE_HEAP:-2g} -Xmx${DORIS_FE_HEAP:-2g} -Dfile.encoding=UTF-8
+    ports:
+      - "127.0.0.1:${DORIS_HTTP_PORT:-18030}:8030"
+      - "127.0.0.1:${DORIS_QUERY_PORT:-9030}:9030"
+    volumes:
+      - doris_fe_data:/opt/apache-doris/fe/doris-meta
+      - doris_fe_logs:/opt/apache-doris/fe/log
+    networks: [dev-backend]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8030/api/bootstrap >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  doris-be:
+    image: apache/doris:${DORIS_BE_VERSION:-be-4.0.1}
+    restart: unless-stopped
+    hostname: doris-be
+    depends_on:
+      doris-fe:
+        condition: service_healthy
+    environment:
+      FE_SERVERS: fe1:doris-fe:9010
+      BE_ADDR: doris-be:9050
+    ports:
+      - "127.0.0.1:${DORIS_BE_HTTP_PORT:-18040}:8040"
+    volumes:
+      - doris_be_data:/opt/apache-doris/be/storage
+      - doris_be_logs:/opt/apache-doris/be/log
+    networks: [dev-backend]
+
+volumes:
+  doris_fe_data:
+  doris_fe_logs:
+  doris_be_data:
+  doris_be_logs:
+
+networks:
+  dev-backend:
+    external: true
+    name: dev-backend

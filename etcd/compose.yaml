@@ -1,0 +1,38 @@
+name: dev-etcd
+
+services:
+  etcd:
+    image: gcr.io/etcd-development/etcd:${ETCD_VERSION:-v3.6.11}
+    restart: unless-stopped
+    command:
+      - /usr/local/bin/etcd
+      - --name=etcd
+      - --data-dir=/etcd-data
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --advertise-client-urls=http://etcd:2379
+      - --listen-peer-urls=http://0.0.0.0:2380
+      - --initial-advertise-peer-urls=http://etcd:2380
+      - --initial-cluster=etcd=http://etcd:2380
+      - --initial-cluster-token=dev-etcd-cluster
+      - --initial-cluster-state=new
+      - --auto-compaction-mode=periodic
+      - --auto-compaction-retention=${ETCD_AUTO_COMPACTION_RETENTION:-1h}
+    ports:
+      - "127.0.0.1:${ETCD_CLIENT_PORT:-2379}:2379"
+    volumes:
+      - etcd_data:/etcd-data
+    networks: [dev-backend]
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/etcdctl", "--endpoints=http://127.0.0.1:2379", "endpoint", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+volumes:
+  etcd_data:
+
+networks:
+  dev-backend:
+    external: true
+    name: dev-backend

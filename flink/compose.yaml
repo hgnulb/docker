@@ -1,0 +1,55 @@
+name: dev-flink
+
+x-flink-common: &flink-common
+  image: flink:${FLINK_VERSION:-2.3.0-scala_2.12-java17}
+  restart: unless-stopped
+  environment:
+    FLINK_PROPERTIES: |
+      jobmanager.rpc.address: jobmanager
+      parallelism.default: ${FLINK_PARALLELISM:-2}
+      state.checkpoints.dir: file:///opt/flink/checkpoints
+      state.savepoints.dir: file:///opt/flink/savepoints
+      rest.flamegraph.enabled: true
+  networks: [dev-backend]
+
+services:
+  jobmanager:
+    <<: *flink-common
+    command: jobmanager
+    ports:
+      - "127.0.0.1:${FLINK_WEB_PORT:-18081}:8081"
+    volumes:
+      - flink_checkpoints:/opt/flink/checkpoints
+      - flink_savepoints:/opt/flink/savepoints
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8081/overview >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  taskmanager:
+    <<: *flink-common
+    command: taskmanager
+    depends_on:
+      jobmanager:
+        condition: service_healthy
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: jobmanager
+        taskmanager.numberOfTaskSlots: ${FLINK_TASK_SLOTS:-2}
+        parallelism.default: ${FLINK_PARALLELISM:-2}
+        state.checkpoints.dir: file:///opt/flink/checkpoints
+        state.savepoints.dir: file:///opt/flink/savepoints
+    volumes:
+      - flink_checkpoints:/opt/flink/checkpoints
+      - flink_savepoints:/opt/flink/savepoints
+
+volumes:
+  flink_checkpoints:
+  flink_savepoints:
+
+networks:
+  dev-backend:
+    external: true
+    name: dev-backend

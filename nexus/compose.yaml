@@ -1,0 +1,30 @@
+name: dev-nexus
+
+services:
+  nexus:
+    image: sonatype/nexus3:${NEXUS_VERSION:-3.93.1}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${NEXUS_PORT:-18086}:8081"
+    environment:
+      INSTALL4J_ADD_VM_PARAMS: >-
+        -Xms${NEXUS_HEAP:-1g} -Xmx${NEXUS_HEAP:-1g}
+        -XX:MaxDirectMemorySize=${NEXUS_DIRECT_MEMORY:-1g}
+        -Djava.util.prefs.userRoot=/nexus-data/javaprefs
+    volumes:
+      - nexus_data:/nexus-data
+    networks: [dev-backend]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8081/service/rest/v1/status >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+      start_period: 60s
+
+volumes:
+  nexus_data:
+
+networks:
+  dev-backend:
+    external: true
+    name: dev-backend

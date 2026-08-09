@@ -1,0 +1,36 @@
+name: dev-consul
+
+services:
+  consul:
+    image: hashicorp/consul:${CONSUL_VERSION:-2.0.2}
+    restart: unless-stopped
+    command:
+      - agent
+      - -server
+      - -ui
+      - -node=consul
+      - -datacenter=${CONSUL_DATACENTER:-dc1}
+      - -bootstrap-expect=1
+      - -client=0.0.0.0
+      - -data-dir=/consul/data
+    ports:
+      - "127.0.0.1:${CONSUL_HTTP_PORT:-8500}:8500"
+      - "127.0.0.1:${CONSUL_DNS_PORT:-8600}:8600/tcp"
+      - "127.0.0.1:${CONSUL_DNS_PORT:-8600}:8600/udp"
+    volumes:
+      - consul_data:/consul/data
+    networks: [dev-backend]
+    healthcheck:
+      test: ["CMD", "consul", "members"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+volumes:
+  consul_data:
+
+networks:
+  dev-backend:
+    external: true
+    name: dev-backend

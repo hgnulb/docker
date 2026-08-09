@@ -1,0 +1,33 @@
+name: dev-airflow
+
+services:
+  airflow:
+    image: apache/airflow:${AIRFLOW_VERSION:-3.2.1}
+    restart: unless-stopped
+    command: standalone
+    ports:
+      - "127.0.0.1:${AIRFLOW_PORT:-18085}:8080"
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: ${AIRFLOW_LOAD_EXAMPLES:-false}
+      AIRFLOW__CORE__DEFAULT_TIMEZONE: ${AIRFLOW_TIMEZONE:-Asia/Shanghai}
+      AIRFLOW__API__BASE_URL: http://localhost:${AIRFLOW_PORT:-18085}
+      AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
+      TZ: ${AIRFLOW_TIMEZONE:-Asia/Shanghai}
+    volumes:
+      - airflow_data:/opt/airflow
+      - ./dags:/opt/airflow/dags
+    networks: [dev-backend]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/api/v2/monitor/health >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+      start_period: 60s
+
+volumes:
+  airflow_data:
+
+networks:
+  dev-backend:
+    external: true
+    name: dev-backend

@@ -1,0 +1,29 @@
+name: dev-meilisearch
+
+services:
+  meilisearch:
+    image: getmeili/meilisearch:${MEILISEARCH_VERSION:-v1.37}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${MEILISEARCH_PORT:-7700}:7700"
+    environment:
+      MEILI_ENV: development
+      MEILI_MASTER_KEY: ${MEILISEARCH_MASTER_KEY:-dev_meilisearch_master_key}
+      MEILI_NO_ANALYTICS: ${MEILISEARCH_NO_ANALYTICS:-true}
+    volumes:
+      - meilisearch_data:/meili_data
+    networks: [dev-backend]
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:7700/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+volumes:
+  meilisearch_data:
+
+networks:
+  dev-backend:
+    external: true
+    name: dev-backend

@@ -13,6 +13,7 @@ services:
       ES_JAVA_OPTS: -Xms${ELASTIC_HEAP:-1g} -Xmx${ELASTIC_HEAP:-1g}
     volumes:
       - elasticsearch_data:/usr/share/elasticsearch/data
+    networks: [dev-backend]
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health >/dev/null || exit 1"]
       interval: 10s
@@ -30,6 +31,7 @@ services:
       - "127.0.0.1:${KIBANA_PORT:-5601}:5601"
     environment:
       ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    networks: [dev-backend]
     healthcheck:
       # 等到 Kibana API 真正可用，避免 `make up --wait` 在页面尚未就绪时提前返回。
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:5601/api/status >/dev/null || exit 1"]
@@ -38,5 +40,37 @@ services:
       retries: 20
       start_period: 30s
 
+  logstash:
+    image: docker.elastic.co/logstash/logstash:${ELASTIC_VERSION:-8.19.17}
+    restart: unless-stopped
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${LOGSTASH_TCP_PORT:-5000}:5000"
+      - "127.0.0.1:${LOGSTASH_BEATS_PORT:-5044}:5044"
+      - "127.0.0.1:${LOGSTASH_API_PORT:-9600}:9600"
+    environment:
+      LS_JAVA_OPTS: -Xms${LOGSTASH_HEAP:-512m} -Xmx${LOGSTASH_HEAP:-512m}
+      XPACK_MONITORING_ENABLED: "false"
+      QUEUE_TYPE: persisted
+      PIPELINE_WORKERS: ${LOGSTASH_PIPELINE_WORKERS:-1}
+    volumes:
+      - ./pipeline:/usr/share/logstash/pipeline:ro
+      - logstash_data:/usr/share/logstash/data
+    networks: [dev-backend]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9600/_node/pipelines >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
 volumes:
   elasticsearch_data:
+  logstash_data:
+
+networks:
+  dev-backend:
+    external: true
+    name: dev-backend
